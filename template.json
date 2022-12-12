@@ -1,0 +1,124 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Transform": "AWS::Serverless-2016-10-31",
+    "Resources": {
+        "HttpApi": {
+            "Type": "AWS::Serverless::HttpApi"
+        },
+        "HttpHandler": {
+            "Type": "AWS::Serverless::Function",
+            "Properties": {
+                "FunctionName": "HttpHandler",
+                "Handler": "bootstrap.is.real.handler",
+                "Runtime": "provided.al2",
+                "CodeUri": ".",
+                "Events": {
+                    "HttpApiEvent": {
+                        "Type": "HttpApi",
+                        "Properties": {
+                            "ApiId": {"Ref": "HttpApi"}
+                        }
+                    }
+                },
+                "Environment": {
+                    "Variables": {
+                        "DispatchMessageTopic": {"Ref": "MessageDispatcher"},
+                        "MessageStoreTable": {"Ref": "MessageStore"}
+                    }
+                }
+            }
+        },
+        "MessageDispatcher": {
+            "Type": "AWS::SNS::Topic"
+        },
+        "MessageHandler": {
+            "Type": "AWS::Serverless::Function",
+            "Properties": {
+                "FunctionName": "MessageHandler",
+                "Handler": "bootstrap.is.real.handler",
+                "Runtime": "provided.al2",
+                "CodeUri": ".",
+                "Events": {
+                    "SNSEvent": {
+                        "Type": "SNS",
+                        "Properties": {
+                            "Topic": {"Ref": "MessageDispatcher"}
+                        }
+                    }
+                },
+                "Environment": {
+                    "Variables": {
+                        "MessageStoreTable": {"Ref": "MessageStore"}
+                    }
+                }
+            }
+        },
+        "MessageStore": {
+            "Type": "AWS::Serverless::SimpleTable",
+            "Properties": {
+                "PrimaryKey": {
+                    "Name": "message_id",
+                    "Type": "String"
+                }
+            }
+        },
+        "HttpApiToFunctionConnector": {
+            "Type": "AWS::Serverless::Connector",
+            "Properties": {
+                "Source": {"Id": "HttpApi"},
+                "Destination": {"Id": "HttpHandler"},
+                "Permissions": ["Write"]
+            }
+        },
+        "HttpHandlerToMessageDispatcherConnector": {
+            "Type": "AWS::Serverless::Connector",
+            "Properties": {
+                "Source": {"Id": "HttpHandler"},
+                "Destination": {"Id": "MessageDispatcher"},
+                "Permissions": ["Write"]
+            }
+        },
+        "MessageTopicToFunctionConnector": {
+            "Type": "AWS::Serverless::Connector",
+            "Properties": {
+                "Source": {"Id": "MessageDispatcher"},
+                "Destination": {"Id": "MessageHandler"},
+                "Permissions": ["Write"]
+            }
+        },
+        "MessageFunctionToStoreConnector": {
+            "Type": "AWS::Serverless::Connector",
+            "Properties": {
+                "Source": {"Id": "MessageHandler"},
+                "Destination": {"Id": "MessageStore"},
+                "Permissions": ["Read", "Write"]
+            }
+        },
+        "HttpHandlerToStoreConnector": {
+            "Type": "AWS::Serverless::Connector",
+            "Properties": {
+                "Source": {"Id": "HttpHandler"},
+                "Destination": {"Id": "MessageStore"},
+                "Permissions": ["Read"]
+            }
+        }
+    },
+    "Outputs": {
+        "HttpApiUrl": {
+            "Description": "URL of API endpoint",
+            "Value": {"Fn::Sub": "https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"}
+        },
+        "HttpApiId": {
+            "Description": "ID of HTTP API",
+            "Value": {"Ref": "HttpApi"}
+        },
+        "MessageDispatcherTopic": {
+            "Description": "SNS topic used to dispatch message commands to the backend",
+            "Value": {"Ref": "MessageDispatcher"}
+        },
+        "MessageStoreTable": {
+            "Description": "Message store table",
+            "Value": {"Ref": "MessageStore"}
+        }
+    }
+}
