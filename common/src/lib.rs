@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -15,7 +16,6 @@ pub struct MessageCommand {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum MessageCommandType {
     Put {
-        message_id: String,
         from: String,
         subject: String,
         contents: String,
@@ -31,7 +31,7 @@ pub struct Message {
     pub from: String,
     pub subject: String,
     pub contents: String,
-    pub timestamp: u64,
+    pub timestamp: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,7 +39,7 @@ pub struct MessageHead {
     pub message_id: String,
     pub from: String,
     pub subject: String,
-    pub timestamp: u64,
+    pub timestamp: DateTime<Utc>,
 }
 
 impl From<Message> for MessageHead {

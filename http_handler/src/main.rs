@@ -2,8 +2,7 @@ use aws_sdk_dynamodb::model::AttributeValue;
 use common::{Message, MessageCommand, MessageCommandType, MessageHead, MessageRequest};
 use lambda_http::{http::Method, run, service_fn, Body, Request, Response};
 use serde::Serialize;
-use serde_dynamo::from_items;
-use uuid::Uuid;
+use serde_dynamo::{from_item, from_items};
 
 fn truncate(input: &str, length: usize) -> &str {
     match input.char_indices().nth(length) {
@@ -19,7 +18,16 @@ pub async fn list_messages(
     let result = client.scan().table_name(table).send().await?;
 
     if let Some(items) = result.items {
-        let messages: Vec<MessageHead> = from_items(items)?;
+        let mut messages = Vec::with_capacity(items.len());
+
+        for item in items {
+            let item: Option<MessageHead> = from_item(item).ok();
+
+            if let Some(item) = item {
+                messages.push(item);
+            }
+        }
+
         Ok(messages)
     } else {
         Ok(Vec::new())
@@ -58,6 +66,11 @@ struct MessageGetResponse {
     messages: Vec<Message>,
 }
 
+#[derive(Debug, Serialize)]
+struct HandlerResponse {
+    message: String,
+}
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Sync + Send>>;
 
 async fn function_handler(event: Request) -> Result<Response<Body>> {
@@ -82,15 +95,18 @@ async fn function_handler(event: Request) -> Result<Response<Body>> {
                 let message_list = MessageListResponse { messages };
 
                 serde_json::to_string(&message_list)?
-            } else if let Some(message_id) = event.uri().path().strip_prefix("/") {
+            } else if let Some(message_id) = event.uri().path().strip_prefix('/') {
                 tracing::info!("Request to get message: {message_id}");
 
-                let messages = get_message(&ddb, &message_store_table, &message_id).await?;
+                let messages = get_message(&ddb, &message_store_table, message_id).await?;
                 let message_get = MessageGetResponse { messages };
 
                 serde_json::to_string(&message_get)?
             } else {
-                r#"{"message":"Invalid message ID"}"#.into()
+                let msg = HandlerResponse {
+                    message: "Invalid message ID".into(),
+                };
+                serde_json::to_string(&msg)?
             }
         }
         Method::POST => {
@@ -100,29 +116,37 @@ async fn function_handler(event: Request) -> Result<Response<Body>> {
                 let request = serde_json::from_str::<MessageRequest>(body)?;
                 let payload = MessageCommand {
                     command: MessageCommandType::Put {
-                        message_id: Uuid::new_v4().to_string(),
                         from: truncate(&request.from, 255).into(),
                         subject: truncate(&request.subject, 255).into(),
-                        contents: truncate(&request.contents, 1024).into(),
+                        contents: truncate(&request.contents, 4096).into(),
                     },
                 };
+
+                let payload = serde_json::to_string(&payload)?;
+                tracing::info!("Sending SNS message: {payload}");
 
                 let pub_ack = sns
                     .publish()
                     .topic_arn(dispatch_message_topic)
-                    .message(serde_json::to_string(&payload)?)
+                    .message(payload)
                     .send()
                     .await?;
 
                 tracing::info!("Published SNS message: {pub_ack:?}");
 
-                r#"{"message":"Message sent"}"#.into()
+                let msg = HandlerResponse {
+                    message: "Message sent".into(),
+                };
+                serde_json::to_string(&msg)?
             } else {
-                r#"{"message":"Invalid request body type"}"#.into()
+                let msg = HandlerResponse {
+                    message: "Invalid request body type".into(),
+                };
+                serde_json::to_string(&msg)?
             }
         }
         Method::DELETE => {
-            if let Some(message_id) = event.uri().path().strip_prefix("/") {
+            if let Some(message_id) = event.uri().path().strip_prefix('/') {
                 tracing::info!("Request to delete message: {message_id}");
 
                 let payload = MessageCommand {
@@ -131,21 +155,35 @@ async fn function_handler(event: Request) -> Result<Response<Body>> {
                     },
                 };
 
+                let payload = serde_json::to_string(&payload)?;
+                tracing::info!("Sending SNS message: {payload}");
+
                 let pub_ack = sns
                     .publish()
                     .topic_arn(dispatch_message_topic)
-                    .message(serde_json::to_string(&payload)?)
+                    .message(payload)
                     .send()
                     .await?;
 
                 tracing::info!("Published SNS message: {pub_ack:?}");
 
-                r#"{"message":"Message sent"}"#.into()
+                let msg = HandlerResponse {
+                    message: "Message queued for deletion".into(),
+                };
+                serde_json::to_string(&msg)?
             } else {
-                r#"{"message":"Invalid message ID"}"#.into()
+                let msg = HandlerResponse {
+                    message: "Invalid message ID".into(),
+                };
+                serde_json::to_string(&msg)?
             }
         }
-        _ => r#"{"message":"Unsupported method"}"#.into(),
+        _ => {
+            let msg = HandlerResponse {
+                message: "Unsupported method".into(),
+            };
+            serde_json::to_string(&msg)?
+        }
     };
 
     Ok(resp.body(out.into()).map_err(Box::new)?)

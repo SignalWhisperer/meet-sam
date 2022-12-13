@@ -1,0 +1,5 @@
+#!/bin/zsh
+cargo lambda build --release
+sam build
+cp target/lambda/http_handler/bootstrap .aws-sam/build/HttpHandler/bootstrap
+cp target/lambda/message_handler/bootstrap .aws-sam/build/MessageHandler/bootstrap

@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "HttpHandler",
-    "MessageHandler",
-    "Common",
+    "http_handler",
+    "message_handler",
+    "common",
 ]

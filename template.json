@@ -11,7 +11,7 @@
                 "FunctionName": "HttpHandler",
                 "Handler": "bootstrap.is.real.handler",
                 "Runtime": "provided.al2",
-                "CodeUri": ".",
+                "CodeUri": "./http_handler",
                 "Events": {
                     "HttpApiEvent": {
                         "Type": "HttpApi",
@@ -37,7 +37,7 @@
                 "FunctionName": "MessageHandler",
                 "Handler": "bootstrap.is.real.handler",
                 "Runtime": "provided.al2",
-                "CodeUri": ".",
+                "CodeUri": "./message_handler",
                 "Events": {
                     "SNSEvent": {
                         "Type": "SNS",
