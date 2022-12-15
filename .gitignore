@@ -2,3 +2,4 @@
 /Cargo.lock
 /.aws-sam
 /.vscode
+/samconfig.toml
