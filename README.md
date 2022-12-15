@@ -92,6 +92,9 @@ You can call the API it created with the following Postman collection. Make sure
           "host": [
             "{{endpoint}}"
           ],
+          "path": [
+            ""
+          ]
         }
       }
     }
