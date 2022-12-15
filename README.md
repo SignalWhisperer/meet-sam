@@ -1,6 +1,6 @@
 # Meet SAM
 
-A basic demonstration of a Rust project using a SAM template to deploy on AWS. There are many workaround required due to issues in the SAM CLI.
+A basic demonstration of a Rust project using a SAM template to deploy on AWS. There are many workaround required due to issues in the SAM CLI. DO NOT USE THIS IN A PRODUCTION ENVIRONMENT. THIS IS JUST AN EXAMPLE OF HOW TO USE RUST WITH SAM TEMPLATES AND NOT A SECURE, ROBUST SOLUTION.
 
 ## Diagram
 
